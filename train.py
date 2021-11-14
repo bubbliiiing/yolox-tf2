@@ -189,14 +189,14 @@ if __name__ == "__main__":
         start_epoch = Init_Epoch
         end_epoch   = Freeze_Epoch
 
-        train_dataloader    = YoloDatasets(train_lines, input_shape, batch_size, num_classes, end_epoch - start_epoch, mosaic = mosaic, train = True)
-        val_dataloader      = YoloDatasets(val_lines, input_shape, batch_size, num_classes, end_epoch - start_epoch, mosaic = False, train = False)
-
         epoch_step          = num_train // batch_size
         epoch_step_val      = num_val // batch_size
 
         if epoch_step == 0 or epoch_step_val == 0:
             raise ValueError('数据集过小，无法进行训练，请扩充数据集。')
+
+        train_dataloader    = YoloDatasets(train_lines, input_shape, batch_size, num_classes, end_epoch - start_epoch, mosaic = mosaic, train = True)
+        val_dataloader      = YoloDatasets(val_lines, input_shape, batch_size, num_classes, end_epoch - start_epoch, mosaic = False, train = False)
 
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
         if eager:
@@ -243,11 +243,14 @@ if __name__ == "__main__":
         start_epoch = Freeze_Epoch
         end_epoch   = UnFreeze_Epoch
 
-        train_dataloader    = YoloDatasets(train_lines, input_shape, batch_size, num_classes, end_epoch - start_epoch, mosaic = mosaic, train = True)
-        val_dataloader      = YoloDatasets(val_lines, input_shape, batch_size, num_classes, end_epoch - start_epoch, mosaic = False, train = False)
-
         epoch_step          = num_train // batch_size
         epoch_step_val      = num_val // batch_size
+
+        if epoch_step == 0 or epoch_step_val == 0:
+            raise ValueError('数据集过小，无法进行训练，请扩充数据集。')
+
+        train_dataloader    = YoloDatasets(train_lines, input_shape, batch_size, num_classes, end_epoch - start_epoch, mosaic = mosaic, train = True)
+        val_dataloader      = YoloDatasets(val_lines, input_shape, batch_size, num_classes, end_epoch - start_epoch, mosaic = False, train = False)
 
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
         if eager:
