@@ -244,6 +244,3 @@ class YOLO(object):
             f.write("%s %s %s %s %s %s\n" % (predicted_class, score[:6], str(int(left)), str(int(top)), str(int(right)),str(int(bottom))))
         f.close()
         return 
-
-    def close_session(self):
-        self.sess.close()
