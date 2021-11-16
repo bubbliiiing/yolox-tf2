@@ -235,7 +235,13 @@ class YOLO(object):
         out_boxes, out_scores, out_classes = self.get_pred(image_data, input_image_shape) 
 
         for i, c in enumerate(out_classes):
-            out_boxes, out_scores, out_classes = self.get_pred(image_data, input_image_shape) 
+            predicted_class             = self.class_names[int(c)]
+            score                       = str(out_scores[i])
+            top, left, bottom, right    = out_boxes[i]
+            if predicted_class not in class_names:
+                continue
+            
+            f.write("%s %s %s %s %s %s\n" % (predicted_class, score[:6], str(int(left)), str(int(top)), str(int(right)),str(int(bottom))))
         f.close()
         return 
 
