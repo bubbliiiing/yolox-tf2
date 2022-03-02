@@ -24,7 +24,12 @@ if __name__ == "__main__":
     #   'fps'表示测试fps，使用的图片是img里面的street.jpg，详情查看下方注释。
     #   'dir_predict'表示遍历文件夹进行检测并保存。默认遍历img文件夹，保存img_out文件夹，详情查看下方注释。
     #----------------------------------------------------------------------------------------------------------#
-    mode = "predict"
+    mode            = "predict"
+    #-------------------------------------------------------------------------#
+    #   crop指定了是否在单张图片预测后对目标进行截取
+    #   crop仅在mode='predict'时有效
+    #-------------------------------------------------------------------------#
+    crop            = False
     #----------------------------------------------------------------------------------------------------------#
     #   video_path用于指定视频的路径，当video_path=0时表示检测摄像头
     #   想要检测视频，则设置如video_path = "xxx.mp4"即可，代表读取出根目录下的xxx.mp4文件。
@@ -67,7 +72,7 @@ if __name__ == "__main__":
                 print('Open Error! Try again!')
                 continue
             else:
-                r_image = yolo.detect_image(image)
+                r_image = yolo.detect_image(image, crop = crop)
                 r_image.show()
 
     elif mode == "video":
@@ -77,11 +82,17 @@ if __name__ == "__main__":
             size    = (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)))
             out     = cv2.VideoWriter(video_save_path, fourcc, video_fps, size)
 
+        ref, frame = capture.read()
+        if not ref:
+            raise ValueError("未能正确读取摄像头（视频），请注意是否正确安装摄像头（是否正确填写视频路径）。")
+
         fps = 0.0
         while(True):
             t1 = time.time()
             # 读取某一帧
-            ref,frame=capture.read()
+            ref, frame = capture.read()
+            if not ref:
+                break
             # 格式转变，BGRtoRGB
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
             # 转变成Image
@@ -103,10 +114,14 @@ if __name__ == "__main__":
             if c==27:
                 capture.release()
                 break
-        capture.release()
-        out.release()
-        cv2.destroyAllWindows()
 
+        print("Video Detection Done!")
+        capture.release()
+        if video_save_path!="":
+            print("Save processed video to the path :" + video_save_path)
+            out.release()
+        cv2.destroyAllWindows()
+        
     elif mode == "fps":
         img = Image.open('img/street.jpg')
         tact_time = yolo.get_FPS(img, test_interval)
@@ -114,8 +129,9 @@ if __name__ == "__main__":
 
     elif mode == "dir_predict":
         import os
+
         from tqdm import tqdm
-        
+
         img_names = os.listdir(dir_origin_path)
         for img_name in tqdm(img_names):
             if img_name.lower().endswith(('.bmp', '.dib', '.png', '.jpg', '.jpeg', '.pbm', '.pgm', '.ppm', '.tif', '.tiff')):
@@ -124,7 +140,7 @@ if __name__ == "__main__":
                 r_image     = yolo.detect_image(image)
                 if not os.path.exists(dir_save_path):
                     os.makedirs(dir_save_path)
-                r_image.save(os.path.join(dir_save_path, img_name))
-                
+                r_image.save(os.path.join(dir_save_path, img_name.replace(".jpg", ".png")), quality=95, subsampling=0)
+
     else:
         raise AssertionError("Please specify the correct mode: 'predict', 'video', 'fps' or 'dir_predict'.")
