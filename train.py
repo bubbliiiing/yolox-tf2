@@ -205,15 +205,34 @@ if __name__ == "__main__":
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
         
-    strategy = tf.distribute.MirroredStrategy()
-    print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
+    if ngpus_per_node > 1:
+        strategy = tf.distribute.MirroredStrategy()
+    else:
+        strategy = None
+        print('Number of devices: {}'.format(ngpus_per_node))
     
     #------------------------------------------------------#
     #   获取classes
     #------------------------------------------------------#
     class_names, num_classes = get_classes(classes_path)
     
-    with strategy.scope():
+    if ngpus_per_node > 1:
+        with strategy.scope():
+            #------------------------------------------------------#
+            #   创建yolo模型
+            #------------------------------------------------------#
+            model_body  = yolo_body([None, None, 3], num_classes = num_classes, phi = phi, weight_decay=weight_decay)
+            if model_path != '':
+                #------------------------------------------------------#
+                #   载入预训练权重
+                #------------------------------------------------------#
+                print('Load weights {}.'.format(model_path))
+                model_body.load_weights(model_path, by_name=True, skip_mismatch=True)
+            if not eager:
+                model       = get_train_model(model_body, input_shape, num_classes)
+            else:
+                yolo_loss   = get_yolo_loss(input_shape, len(model_body.output), num_classes)
+    else:
         #------------------------------------------------------#
         #   创建yolo模型
         #------------------------------------------------------#
@@ -224,7 +243,6 @@ if __name__ == "__main__":
             #------------------------------------------------------#
             print('Load weights {}.'.format(model_path))
             model_body.load_weights(model_path, by_name=True, skip_mismatch=True)
-
         if not eager:
             model       = get_train_model(model_body, input_shape, num_classes)
         else:
@@ -349,7 +367,7 @@ if __name__ == "__main__":
                 K.set_value(optimizer.lr, lr)
 
                 fit_one_epoch(model_body, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, 
-                                            end_epoch, input_shape, num_classes, save_period, save_dir)
+                                            end_epoch, input_shape, num_classes, save_period, save_dir, strategy)
                             
                 train_dataloader.on_epoch_end()
                 val_dataloader.on_epoch_end()
@@ -357,7 +375,10 @@ if __name__ == "__main__":
             start_epoch = Init_Epoch
             end_epoch   = Freeze_Epoch if Freeze_Train else UnFreeze_Epoch
 
-            with strategy.scope():
+            if ngpus_per_node > 1:
+                with strategy.scope():
+                    model.compile(optimizer = optimizer, loss={'yolo_loss': lambda y_true, y_pred: y_pred})
+            else:
                 model.compile(optimizer = optimizer, loss={'yolo_loss': lambda y_true, y_pred: y_pred})
             #-------------------------------------------------------------------------------#
             #   训练参数的设置
@@ -415,7 +436,10 @@ if __name__ == "__main__":
                     
                 for i in range(len(model_body.layers)): 
                     model_body.layers[i].trainable = True
-                with strategy.scope():
+                if ngpus_per_node > 1:
+                    with strategy.scope():
+                        model.compile(optimizer = optimizer, loss={'yolo_loss': lambda y_true, y_pred: y_pred})
+                else:
                     model.compile(optimizer = optimizer, loss={'yolo_loss': lambda y_true, y_pred: y_pred})
 
                 epoch_step      = num_train // batch_size
