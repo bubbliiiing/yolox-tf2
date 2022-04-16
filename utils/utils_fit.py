@@ -36,7 +36,7 @@ def get_train_step_fn(strategy):
         @tf.function
         def distributed_train_step(imgs, targets, net, yolo_loss, optimizer):
             per_replica_losses = strategy.run(train_step, args=(imgs, targets, net, yolo_loss, optimizer,))
-            return strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses,
+            return strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_losses,
                                     axis=None)
         return distributed_train_step
 
