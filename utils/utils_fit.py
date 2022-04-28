@@ -40,22 +40,41 @@ def get_train_step_fn(strategy):
                                     axis=None)
         return distributed_train_step
 
-def val_step(imgs, targets, net, yolo_loss, optimizer):
-    #------------------------------#
-    #   计算loss
-    #------------------------------#
-    P5_output, P4_output, P3_output = net(imgs, training=False)
-    args        = [P5_output, P4_output, P3_output] + [targets]
-    loss_value  = yolo_loss(args)
-    #------------------------------#
-    #   添加上l2正则化参数
-    #------------------------------#
-    loss_value  = tf.reduce_sum(net.losses) + loss_value
-    return loss_value
-
+#----------------------#
+#   防止bug
+#----------------------#
+def get_val_step_fn(strategy):
+    @tf.function
+    def val_step(imgs, targets, net, yolo_loss, optimizer):
+        #------------------------------#
+        #   计算loss
+        #------------------------------#
+        P5_output, P4_output, P3_output = net(imgs, training=False)
+        args        = [P5_output, P4_output, P3_output] + [targets]
+        loss_value  = yolo_loss(args)
+        #------------------------------#
+        #   添加上l2正则化参数
+        #------------------------------#
+        loss_value  = tf.reduce_sum(net.losses) + loss_value
+        return loss_value
+    if strategy == None:
+        return val_step
+    else:
+        #----------------------#
+        #   多gpu验证
+        #----------------------#
+        @tf.function
+        def distributed_val_step(imgs, targets, net, yolo_loss, optimizer):
+            per_replica_losses = strategy.run(val_step, args=(imgs, targets, net, yolo_loss, optimizer,))
+            return strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_losses,
+                                    axis=None)
+        return distributed_val_step
+    
 def fit_one_epoch(net, yolo_loss, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, Epoch, 
             input_shape, num_classes, save_period, save_dir, strategy):
     train_step  = get_train_step_fn(strategy)
+    val_step    = get_val_step_fn(strategy)
+    
     loss        = 0
     val_loss    = 0
     print('Start Train')
@@ -64,9 +83,8 @@ def fit_one_epoch(net, yolo_loss, loss_history, optimizer, epoch, epoch_step, ep
             if iteration >= epoch_step:
                 break
             images, targets = batch[0], batch[1]
-            targets     = tf.convert_to_tensor(targets)
-            loss_value  = train_step(images, targets, net, yolo_loss, optimizer)
-            loss        = loss + loss_value
+            loss_value      = train_step(images, targets, net, yolo_loss, optimizer)
+            loss            = loss + loss_value
 
             pbar.set_postfix(**{'total_loss': float(loss) / (iteration + 1), 
                                 'lr'        : optimizer.lr.numpy()})
@@ -79,9 +97,8 @@ def fit_one_epoch(net, yolo_loss, loss_history, optimizer, epoch, epoch_step, ep
             if iteration >= epoch_step_val:
                 break
             images, targets = batch[0], batch[1]
-            targets     = tf.convert_to_tensor(targets)
-            loss_value  = val_step(images, targets, net, yolo_loss, optimizer)
-            val_loss = val_loss + loss_value
+            loss_value      = val_step(images, targets, net, yolo_loss, optimizer)
+            val_loss        = val_loss + loss_value
 
             pbar.set_postfix(**{'total_loss': float(val_loss) / (iteration + 1)})
             pbar.update(1)
