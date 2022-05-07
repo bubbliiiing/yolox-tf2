@@ -22,7 +22,7 @@ def yolo_body(input_shape, num_classes, phi, weight_decay=5e-4):
     #   feat2 40, 40, 512
     #   feat3 20, 20, 1024
     #---------------------------------------------------#
-    feat1, feat2, feat3 = darknet_body(inputs, depth, width)
+    feat1, feat2, feat3 = darknet_body(inputs, depth, width, weight_decay=weight_decay)
 
     P5          = DarknetConv2D_BN_SiLU(int(in_channels[1] * width), (1, 1), weight_decay=weight_decay, name = 'backbone.lateral_conv0')(feat3)  
     P5_upsample = UpSampling2D()(P5)  # 512/16
